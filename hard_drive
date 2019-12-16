@@ -1,0 +1,14 @@
+hard_drive = {
+  0 = {
+    drive_select = 1
+  }
+  1 = {
+    drive_select = 1
+  }
+  2 = {
+    drive_select = 0
+  }
+  3 = {
+    drive_select = 0
+  }
+}

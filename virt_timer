@@ -1,0 +1,41 @@
+virt_timer = {
+  timer = {
+    0 = {
+      inUse = true
+      period = 2147483647
+      timeToFire = 2147483647
+      active = true
+      continuous = true
+    }
+    1 = {
+      inUse = true
+      period = 200000
+      timeToFire = 27800000
+      active = true
+      continuous = true
+    }
+    2 = {
+      inUse = true
+      period = 3598
+      timeToFire = 27718331
+      active = true
+      continuous = false
+    }
+  }
+  current_timers_time = 27714733
+  timers_next_event_time = 3598
+  last_sequential_time = 0
+  virtual_next_event_time = 3598
+  current_virtual_time = 27714733
+  last_real_time = 286489281000
+  total_real_usec = 0
+  last_realtime_delta = 0
+  last_usec = 0
+  usec_per_second = 1000000
+  stored_delta = 0
+  last_system_usec = 0
+  em_last_realtime = 0
+  total_ticks = 0
+  last_realtime_ticks = 0
+  ticks_per_second = 1000000
+}
