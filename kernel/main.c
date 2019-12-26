@@ -13,8 +13,22 @@
 #include "proc.h"
 #include "global.h"
 
+//一些宏定义
+#define MAX_READER 3
+#define TIME 300
+#define MODE 0
+#define HUNGRY 1
+//Declarations
+PRIVATE void initSem(Semaphore *s, int value);
+PRIVATE void printEndRead(char who);
+PRIVATE void printEndWrite(char who);
+PRIVATE void printStartRead(char who);
+PRIVATE void printStartWrite(char who);
+PRIVATE void printCurrent();
+PRIVATE void read(char who);
 /*======================================================================*
-                            kernel_main
+                            kern
+							el_main
  *======================================================================*/
 PUBLIC int kernel_main()
 {
@@ -48,20 +62,34 @@ PUBLIC int kernel_main()
 		p_proc->regs.eip = (u32)p_task->initial_eip;
 		p_proc->regs.esp = (u32)p_task_stack;
 		p_proc->regs.eflags = 0x1202; /* IF=1, IOPL=1 */
-
+		// p_proc->ticks = p_proc->blocked = 0;
 		p_task_stack -= p_task->stacksize;
 		p_proc++;
 		p_task++;
 		selector_ldt += 1 << 3;
 	}
 
-	proc_table[0].ticks = proc_table[0].priority = 3;
-	proc_table[1].ticks = proc_table[1].priority = 2;
-	proc_table[2].ticks = proc_table[2].priority = 1;
+	// Init --Start
+	proc_table[0].ticks = proc_table[0].blocked = 0;
+	proc_table[1].ticks = proc_table[1].blocked = 0;
+	proc_table[2].ticks = proc_table[2].blocked = 0;
+	proc_table[3].ticks = proc_table[3].blocked = 0;
+	proc_table[4].ticks = proc_table[4].blocked = 0;
+	proc_table[5].ticks = proc_table[5].blocked = 0;
+
+	initSem(&rmutex, 1);
+	initSem(&wmutex, 1);
+	initSem(&x_lock, 1);
+	initSem(&y_lock, 1);
+	initSem(&s_lock, 1);
+	initSem(&rmax, MAX_READER);
+	rc = wc = 0;
+	Mode = MODE;
+	clear();
+	//Init --End
 
 	k_reenter = 0;
 	ticks = 0;
-
 	p_proc_ready = proc_table;
 
 	/* 初始化 8253 PIT */
@@ -79,44 +107,265 @@ PUBLIC int kernel_main()
 	}
 }
 
-/*======================================================================*
-                               TestA
- *======================================================================*/
-void TestA()
+void ReaderA()
 {
 	int i = 0;
 	while (1)
 	{
-		char str[10] = "A";
-		color_print(str, GREEN);
-		milli_delay(1);
+		// printStartRead('A' + i);
+		if (!HUNGRY)
+			P(&s_lock, i);
+		if (Mode == 1)
+			P(&rmutex, i);
+		P(&x_lock, i);
+		if (rc == 0)
+			P(&wmutex, i);
+		rc++;
+		V(&x_lock);
+		if (Mode == 1)
+			V(&rmutex);
+		if (!HUNGRY)
+			V(&s_lock);
+
+		P(&rmax, i);
+		printStartRead('A' + i);
+		currentProc = 'A' + i;
+		read('A' + i);
+		milli_delay(2 * TIME);
+		printEndRead('A' + i);
+		V(&rmax);
+
+		P(&x_lock, i);
+		rc--;
+		if (rc == 0)
+		{
+			V(&wmutex);
+		}
+		V(&x_lock);
 	}
 }
 
-/*======================================================================*
-                               TestB
- *======================================================================*/
-void TestB()
+void ReaderB()
 {
-	int i = 0x1000;
+	int i = 1;
 	while (1)
 	{
-		char str[10] = "B";
-		color_print(str, RED);
-		milli_delay(1);
+		// printStartRead('A' + i);
+		if (!HUNGRY)
+			P(&s_lock, i);
+		if (Mode == 1)
+			P(&rmutex, i);
+		P(&x_lock, i);
+		if (rc == 0)
+			P(&wmutex, i);
+		rc++;
+		V(&x_lock);
+		if (Mode == 1)
+			V(&rmutex);
+		if (!HUNGRY)
+			V(&s_lock);
+
+		P(&rmax, i);
+		printStartRead('A' + i);
+		currentProc = 'A' + i;
+		read('A' + i);
+		milli_delay(3 * TIME);
+		printEndRead('A' + i);
+		V(&rmax);
+
+		P(&x_lock, i);
+		rc--;
+		if (rc == 0)
+		{
+			V(&wmutex);
+		}
+		V(&x_lock);
 	}
 }
 
-/*======================================================================*
-                               TestC
- *======================================================================*/
-void TestC()
+void ReaderC()
 {
-	int i = 0x2000;
+	int i = 2;
 	while (1)
 	{
-		char str[10] = "C";
-		color_print(str, WHITE);
-		milli_delay(1);
+		// printStartRead('A' + i);
+		if (!HUNGRY)
+			P(&s_lock, i);
+		if (Mode == 1)
+			P(&rmutex, i);
+		P(&x_lock, i);
+		if (rc == 0)
+			P(&wmutex, i);
+		rc++;
+		V(&x_lock);
+		if (Mode == 1)
+			V(&rmutex);
+		if (!HUNGRY)
+			V(&s_lock);
+
+		P(&rmax, i);
+		printStartRead('A' + i);
+		currentProc = 'A' + i;
+		read('A' + i);
+		milli_delay(3 * TIME);
+		printEndRead('A' + i);
+		V(&rmax);
+
+		P(&x_lock, i);
+		rc--;
+		if (rc == 0)
+		{
+			V(&wmutex);
+		}
+		V(&x_lock);
+	}
+}
+
+void WriterD()
+{
+	int i = 3;
+	while (1)
+	{
+		// printStartWrite('A' + i);
+		if (!HUNGRY)
+			P(&s_lock, i);
+		if (Mode == 1)
+		{
+			P(&y_lock, i);
+			wc++;
+			if (wc == 1)
+				P(&rmutex, i);
+			V(&y_lock);
+		}
+
+		P(&wmutex, i);
+		printStartWrite('A' + i);
+		currentProc = 'A' + i;
+		read('A' + i);
+		milli_delay(3 * TIME);
+		printEndWrite('A' + i);
+		V(&wmutex);
+
+		if (Mode == 1)
+		{
+			P(&y_lock, i);
+			wc--;
+			if (wc == 0)
+				V(&rmutex);
+			V(&y_lock);
+		}
+		if (!HUNGRY)
+			V(&s_lock);
+	}
+}
+
+void WriterE()
+{
+	int i = 4;
+	while (1)
+	{
+		// printStartWrite('A' + i);
+		if (!HUNGRY)
+			P(&s_lock, i);
+		if (Mode == 1)
+		{
+			P(&y_lock, i);
+			wc++;
+			if (wc == 1)
+				P(&rmutex, i);
+			V(&y_lock);
+		}
+
+		P(&wmutex, i);
+		printStartWrite('A' + i);
+		currentProc = 'A' + i;
+		read('A' + i);
+		milli_delay(4 * TIME);
+		printEndWrite('A' + i);
+		V(&wmutex);
+
+		if (Mode == 1)
+		{
+			P(&y_lock, i);
+			wc--;
+			if (wc == 0)
+				V(&rmutex);
+			V(&y_lock);
+		}
+		if (!HUNGRY)
+			V(&s_lock);
+	}
+}
+
+void F()
+{
+	while (1)
+	{
+		mydelay(1 * TIME);
+		printCurrent();
+	}
+}
+
+//其他工具函数
+PRIVATE void initSem(Semaphore *s, int value)
+{
+	s->phead = s->ptail = 0;
+	s->value = value;
+}
+
+PRIVATE void read(char who)
+{
+	char out[20] = "  is Reading!\n\0";
+	char p = who;
+	out[0] = p;
+	color_print(out, WHITE);
+}
+
+PRIVATE void printEndRead(char who)
+{
+	char out[20] = "Reader   End!\n\0";
+	char p = who;
+	out[7] = p;
+	color_print(out, RED);
+}
+
+PRIVATE void printEndWrite(char who)
+{
+	char out[20] = "Writer   End!\n\0";
+	char p = who;
+	out[7] = p;
+	color_print(out, GREEN);
+}
+
+PRIVATE void printStartRead(char who)
+{
+	char out[20] = "Reader   Start!\n\0";
+	char p = who;
+	out[7] = p;
+	color_print(out, RED);
+}
+
+PRIVATE void printStartWrite(char who)
+{
+	char out[20] = "Writer   Start!\n\0";
+	char p = who;
+	out[7] = p;
+	color_print(out, GREEN);
+}
+
+PRIVATE void printCurrent()
+{
+	if (currentProc == 'A' || currentProc == 'B' || currentProc == 'C')
+	{
+		char out[20] = "Now Reading:  \n\0";
+		out[13] = '0' + rc; //TODO
+		// out[13] = currentProc;
+		print(out);
+	}
+	else if (currentProc == 'D' || currentProc == 'E')
+	{
+		char out[20] = "Now Writing:  \n\0";
+		out[13] = currentProc;
+		print(out);
 	}
 }

@@ -66,7 +66,8 @@
 #define PRINTER_IRQ 7
 #define AT_WINI_IRQ 14 /* at winchester */
 
+//TODO
 /* system call */
-#define NR_SYS_CALL 3
+#define NR_SYS_CALL 6
 
 #endif /* _ORANGES_CONST_H_ */
